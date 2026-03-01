@@ -1,7 +1,13 @@
 package com.afhara.mywebsocket.feature.cryptolist.presentation
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -33,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -89,24 +97,14 @@ fun CryptoListScreen(
         viewModel.effect.collect { effect ->
             when (effect) {
                 is CryptoListEffect.NavigateToDetail -> onCryptoClick(effect.id)
-                is CryptoListEffect.ShowError -> { /* TODO: snackbar */ }
+                is CryptoListEffect.ShowError -> { /* TODO: snackbar */
+                }
             }
         }
     }
 
     when {
-        state.isLoading -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Loading market data...")
-                }
-            }
-        }
+        state.isLoading -> CryptoListLoadingContent()
 
         state.error != null -> {
             Box(
@@ -223,13 +221,13 @@ fun CryptoListItem(
     val changeColor = if (isPositive) Color(0xFF4CAF50) else Color(0xFFF44336)
 
     val flashColor = when (flash) {
-        PriceFlash.UP -> Color(0xFF4CAF50).copy(alpha = 0.1f)
-        PriceFlash.DOWN -> Color(0xFFF44336).copy(alpha = 0.1f)
+        PriceFlash.UP -> Color(0xFF00AA00).copy(alpha = 0.50f)
+        PriceFlash.DOWN -> Color(0xFFCC0000).copy(alpha = 0.50f)
         PriceFlash.NONE -> Color.Transparent
     }
     val animatedColor by animateColorAsState(
         targetValue = flashColor,
-        animationSpec = tween(durationMillis = 300),
+        animationSpec = tween(durationMillis = 400),
     )
 
     Row(
@@ -285,6 +283,106 @@ fun CryptoListItem(
             color = changeColor,
             textAlign = TextAlign.End,
             modifier = Modifier.width(70.dp),
+        )
+    }
+}
+
+@Composable
+private fun CryptoListLoadingContent() {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.75f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "shimmerAlpha",
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Box(
+            modifier = Modifier
+                .width(80.dp)
+                .height(28.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)),
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .width(60.dp)
+                .height(14.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)),
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Fetching market data...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        HorizontalDivider()
+        repeat(8) {
+            ShimmerListRow(alpha = alpha)
+            HorizontalDivider()
+        }
+    }
+}
+
+@Composable
+private fun ShimmerListRow(alpha: Float) {
+    val color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(20.dp)
+                .height(12.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .width(90.dp)
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(color)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(
+                modifier = Modifier.width(40.dp).height(12.dp).clip(RoundedCornerShape(4.dp))
+                    .background(color)
+            )
+        }
+        Box(
+            modifier = Modifier.width(80.dp).height(14.dp).clip(RoundedCornerShape(4.dp))
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier.width(55.dp).height(14.dp).clip(RoundedCornerShape(4.dp))
+                .background(color)
         )
     }
 }

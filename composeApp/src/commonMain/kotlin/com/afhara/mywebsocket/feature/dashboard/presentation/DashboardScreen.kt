@@ -1,7 +1,13 @@
 package com.afhara.mywebsocket.feature.dashboard.presentation
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,9 +18,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -28,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -71,18 +81,7 @@ fun DashboardScreen(
     }
 
     when {
-        state.isLoading -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Loading market data...")
-                }
-            }
-        }
+        state.isLoading -> DashboardLoadingContent()
 
         state.error != null -> {
             Box(
@@ -152,13 +151,13 @@ fun CryptoCard(
 
     // Flash animation
     val flashColor = when (flash) {
-        PriceFlash.UP -> Color(0xFF4CAF50).copy(alpha = 0.15f)
-        PriceFlash.DOWN -> Color(0xFFF44336).copy(alpha = 0.15f)
+        PriceFlash.UP -> Color(0xFF00AA00).copy(alpha = 0.55f)
+        PriceFlash.DOWN -> Color(0xFFCC0000).copy(alpha = 0.55f)
         PriceFlash.NONE -> MaterialTheme.colorScheme.surfaceVariant
     }
     val animatedColor by animateColorAsState(
         targetValue = flashColor,
-        animationSpec = tween(durationMillis = 300),
+        animationSpec = tween(durationMillis = 400),
     )
 
     Card(
@@ -199,6 +198,86 @@ fun CryptoCard(
                 fontWeight = FontWeight.SemiBold,
                 color = changeColor,
             )
+        }
+    }
+}
+
+@Composable
+private fun DashboardLoadingContent() {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.75f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "shimmerAlpha",
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .width(130.dp)
+                .height(28.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)),
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Box(
+            modifier = Modifier
+                .width(180.dp)
+                .height(14.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)),
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Connecting to live prices...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            userScrollEnabled = false,
+        ) {
+            items(6) {
+                ShimmerCryptoCard(alpha = alpha)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShimmerCryptoCard(alpha: Float) {
+    val color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Box(modifier = Modifier.width(80.dp).height(16.dp).clip(RoundedCornerShape(4.dp)).background(color))
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(modifier = Modifier.width(44.dp).height(12.dp).clip(RoundedCornerShape(4.dp)).background(color))
+            Spacer(modifier = Modifier.height(12.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(22.dp).clip(RoundedCornerShape(4.dp)).background(color))
+            Spacer(modifier = Modifier.height(6.dp))
+            Box(modifier = Modifier.width(60.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).background(color))
         }
     }
 }
