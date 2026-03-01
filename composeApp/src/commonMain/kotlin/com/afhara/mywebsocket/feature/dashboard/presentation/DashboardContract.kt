@@ -1,4 +1,4 @@
-package com.afhara.mywebsocket.feature.dashboard.persentation
+package com.afhara.mywebsocket.feature.dashboard.presentation
 
 import com.afhara.mywebsocket.data.model.CryptoTicker
 

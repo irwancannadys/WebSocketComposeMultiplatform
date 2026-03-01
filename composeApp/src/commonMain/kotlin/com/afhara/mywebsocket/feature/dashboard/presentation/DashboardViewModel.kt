@@ -1,4 +1,4 @@
-package com.afhara.mywebsocket.feature.dashboard.persentation
+package com.afhara.mywebsocket.feature.dashboard.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -51,6 +51,10 @@ class DashboardViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
 
+            // 1. Init Kraken pairs (auto-detect)
+            launch { repository.initKrakenPairs() }
+
+            // 2. Load REST data
             repository.getCoins(DASHBOARD_IDS)
                 .onSuccess { tickers ->
                     _state.update {
@@ -67,21 +71,27 @@ class DashboardViewModel(
     }
 
     private fun connectWebSocket() {
-        // Don't reconnect if already running
         if (webSocketJob?.isActive == true) return
-        // Don't connect if no tickers loaded
         if (_state.value.tickers.isEmpty()) return
+
+        // Only subscribe coins that Kraken supports
+        val supportedIds = repository.getKrakenSupportedIds()
+        val toSubscribe = DASHBOARD_IDS.filter { it in supportedIds }
+
+        if (toSubscribe.isEmpty()) {
+            println("⚠️ No Kraken-supported coins to subscribe")
+            return
+        }
 
         webSocketJob = viewModelScope.launch {
             try {
-                println("🔌 WebSocket: Connecting...")
-                repository.streamPrices(DASHBOARD_IDS).collect { priceMap ->
+                println("🔌 WebSocket: Connecting for $toSubscribe...")
+                repository.streamPrices(toSubscribe).collect { priceMap ->
                     _state.update { currentState ->
                         val flashMap = mutableMapOf<String, PriceFlash>()
                         val updatedTickers = currentState.tickers.map { ticker ->
                             val newPrice = priceMap[ticker.id]
                             if (newPrice != null && newPrice != ticker.price) {
-                                println("💰 Updating ${ticker.id}: ${ticker.price} -> $newPrice")
                                 flashMap[ticker.id] = if (newPrice > ticker.price) {
                                     PriceFlash.UP
                                 } else {
@@ -98,7 +108,6 @@ class DashboardViewModel(
                         )
                     }
 
-                    // Clear flash after 500ms
                     if (priceMap.isNotEmpty()) {
                         delay(500)
                         _state.update { it.copy(priceFlash = emptyMap()) }

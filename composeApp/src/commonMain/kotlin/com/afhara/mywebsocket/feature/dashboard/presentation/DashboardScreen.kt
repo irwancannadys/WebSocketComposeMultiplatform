@@ -1,4 +1,4 @@
-package com.afhara.mywebsocket.feature.dashboard.persentation
+package com.afhara.mywebsocket.feature.dashboard.presentation
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween

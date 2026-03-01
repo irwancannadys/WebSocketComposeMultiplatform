@@ -19,8 +19,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.afhara.mywebsocket.core.di.appModule
 import com.afhara.mywebsocket.feature.auth.LoginScreen
-import com.afhara.mywebsocket.feature.cryptolist.CryptoListScreen
-import com.afhara.mywebsocket.feature.dashboard.persentation.DashboardScreen
+import com.afhara.mywebsocket.feature.cryptolist.presentation.CryptoListScreen
+import com.afhara.mywebsocket.feature.dashboard.presentation.DashboardScreen
 import com.afhara.mywebsocket.feature.detail.DetailScreen
 import com.afhara.mywebsocket.navigation.BottomNavItem
 import com.afhara.mywebsocket.navigation.Screen

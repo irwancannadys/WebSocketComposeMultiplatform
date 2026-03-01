@@ -6,14 +6,12 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
-import io.ktor.websocket.send
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -22,30 +20,76 @@ class KrakenWebSocket(private val client: HttpClient) {
 
     companion object {
         private const val WS_URL = "wss://ws.kraken.com"
-
-        // Mapping: CoinGecko id -> Kraken pair
-        val ID_TO_PAIR = mapOf(
-            "bitcoin" to "XBT/USD",
-            "ethereum" to "ETH/USD",
-            "solana" to "SOL/USD",
-            "binancecoin" to "BNB/USD",
-        )
-
-        // Reverse: Kraken pair -> CoinGecko id
-        val PAIR_TO_ID = ID_TO_PAIR.entries.associate { (k, v) -> v to k }
     }
 
     private val json = Json { ignoreUnknownKeys = true }
     private var session: WebSocketSession? = null
 
+    // Dynamic mappings — populated at runtime
+    private var idToPair = mutableMapOf<String, String>()
+    private var pairToId = mutableMapOf<String, String>()
+
+    // Set available pairs from Kraken API
+    fun setAvailablePairs(availablePairs: Set<String>) {
+        val krakenMapping = mapOf(
+            "bitcoin" to "XBT/USD",
+            "ethereum" to "ETH/USD",
+            "solana" to "SOL/USD",
+            "ripple" to "XRP/USD",
+            "cardano" to "ADA/USD",
+            "dogecoin" to "DOGE/USD",
+            "polkadot" to "DOT/USD",
+            "chainlink" to "LINK/USD",
+            "avalanche-2" to "AVAX/USD",
+            "matic-network" to "MATIC/USD",
+            "litecoin" to "LTC/USD",
+            "uniswap" to "UNI/USD",
+            "stellar" to "XLM/USD",
+            "cosmos" to "ATOM/USD",
+            "tron" to "TRX/USD",
+            "near" to "NEAR/USD",
+            "aptos" to "APT/USD",
+            "arbitrum" to "ARB/USD",
+            "optimism" to "OP/USD",
+            "filecoin" to "FIL/USD",
+            "aave" to "AAVE/USD",
+            "algorand" to "ALGO/USD",
+            "the-sandbox" to "SAND/USD",
+            "shiba-inu" to "SHIB/USD",
+            "pepe" to "PEPE/USD",
+        )
+
+        idToPair.clear()
+        pairToId.clear()
+
+        if (availablePairs.isEmpty()) {
+            // Fallback: use all known mappings
+            println("⚠️ Using fallback Kraken pairs (REST failed)")
+            krakenMapping.forEach { (id, pair) ->
+                idToPair[id] = pair
+                pairToId[pair] = id
+            }
+        } else {
+            krakenMapping.forEach { (id, pair) ->
+                if (availablePairs.contains(pair)) {
+                    idToPair[id] = pair
+                    pairToId[pair] = id
+                }
+            }
+        }
+
+        println("✅ Kraken supported pairs: ${idToPair.keys}")
+    }
+
+    fun getSupportedIds(): Set<String> = idToPair.keys
+
     suspend fun connect(assets: List<String>): Flow<Map<String, Double>> {
-        val pairs = assets.mapNotNull { ID_TO_PAIR[it] }
-        if (pairs.isEmpty()) throw IllegalArgumentException("No valid pairs")
+        val pairs = assets.mapNotNull { idToPair[it] }
+        if (pairs.isEmpty()) throw IllegalArgumentException("No valid pairs to subscribe")
 
         val wsSession = client.webSocketSession(WS_URL)
         session = wsSession
 
-        // Subscribe to ticker
         val subscribeMsg = """
             {
                 "event": "subscribe",
@@ -54,6 +98,8 @@ class KrakenWebSocket(private val client: HttpClient) {
             }
         """.trimIndent()
         wsSession.send(Frame.Text(subscribeMsg))
+
+        println("📡 Subscribed to: $pairs")
 
         return wsSession.incoming
             .receiveAsFlow()
@@ -67,19 +113,15 @@ class KrakenWebSocket(private val client: HttpClient) {
     private fun parseTicker(text: String): Map<String, Double>? {
         return try {
             val element = json.parseToJsonElement(text)
-
-            // Ticker data comes as array: [channelId, {data}, "ticker", "XBT/USD"]
             if (element is JsonArray && element.size >= 4) {
-                val pair = element.last().jsonPrimitive.content  // "XBT/USD"
-                val coinId = PAIR_TO_ID[pair] ?: return null
+                val pair = element.last().jsonPrimitive.content
+                val coinId = pairToId[pair] ?: return null
                 val data = element[1].jsonObject
-                // "c" = last trade closed [price, lotVolume]
                 val price = data["c"]?.jsonArray?.get(0)?.jsonPrimitive?.content?.toDoubleOrNull()
                     ?: return null
-
                 mapOf(coinId to price)
             } else {
-                null // skip events, heartbeats, subscription status
+                null
             }
         } catch (e: Exception) {
             null
